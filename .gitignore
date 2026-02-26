@@ -69,3 +69,7 @@ src/dungeon_weaver/
 tests/test_campaign*
 tests/test_combat*
 tests/test_image*
+
+# Personal user data (not for version control)
+MEMORY.md
+USER.md

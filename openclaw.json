@@ -1,0 +1,26 @@
+{
+  "agent": {
+    "name": "Cooking Planner Agent",
+    "description": "AI meal planning assistant with Telegram interface"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "dmPolicy": "pairing",
+      "allowedUsers": [],
+      "description": "Telegram channel for meal planning interactions"
+    }
+  },
+  "mcp": {
+    "servers": []
+  },
+  "cron": {
+    "jobs": []
+  },
+  "memory": {
+    "type": "hybrid",
+    "vectorStore": "default",
+    "bm25": true
+  }
+}

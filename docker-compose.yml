@@ -1,0 +1,32 @@
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: mealie
+    ports:
+      - "9925:9000"
+    environment:
+      # Database
+      DB_ENGINE: sqlite
+      # Localization
+      LANG: es_ES.UTF-8
+      TZ: Europe/Madrid
+      # Security - disable public registration
+      ALLOW_SIGNUP: "false"
+      # API
+      API_DOCS: "true"
+      # Optional: set a default recipe language
+      DEFAULT_LANGUAGE: es
+    volumes:
+      # Persistent data volume
+      - mealie_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen(\"http://localhost:9000/api/app/about\").read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mealie_data:
+    driver: local

@@ -38,15 +38,18 @@ def search_recipes(query: str) -> dict[str, Any]:
     if err := _check_token():
         return err
     try:
-        r = requests.get(f"{BASE_URL}/api/recipes", headers=_headers(), timeout=30)
+        r = requests.get(
+            f"{BASE_URL}/api/recipes",
+            headers=_headers(),
+            params={"search": query, "perPage": 200, "page": 1, "orderBy": "name", "orderDirection": "asc"},
+            timeout=30,
+        )
         if not (200 <= r.status_code < 300):
             return {"ok": False, "status": r.status_code, "body": r.text[:1000]}
         items = r.json().get("items") or []
-        q = query.lower().strip()
         matches = [
             {"name": it.get("name"), "slug": it.get("slug")}
             for it in items
-            if q in (it.get("name") or "").lower()
         ]
         return {"ok": True, "query": query, "total": len(matches), "items": matches}
     except Exception as e:

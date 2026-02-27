@@ -472,5 +472,83 @@ def tag_recipe(slug: str, tags: list[str]) -> dict[str, Any]:
         return {"ok": False, "error": f"tag_recipe_failed: {e}"}
 
 
+
+# ──────────────────────────────────────────────
+# COMENTARIOS Y COOKING LOG
+# ──────────────────────────────────────────────
+
+@mcp.tool()
+def add_recipe_comment(slug: str, text: str) -> dict[str, Any]:
+    """
+    Añade un comentario a una receta en Mealie.
+    Ideal para guardar el feedback del usuario (rating, notas) visible en el panel de escritorio.
+    slug: slug de la receta.
+    text: texto del comentario (ej: "4 estrellas, muy buena, la repetiria con mas ajo").
+    """
+    if err := _check_token():
+        return err
+    try:
+        rr = requests.get(f"{BASE_URL}/api/recipes/{slug}", headers=_headers(), timeout=30)
+        if not (200 <= rr.status_code < 300):
+            return {"ok": False, "status": rr.status_code, "error": f"recipe_not_found: {slug}"}
+        recipe_id = rr.json().get("id")
+        if not recipe_id:
+            return {"ok": False, "error": f"recipe_id_missing_for: {slug}"}
+
+        r = requests.post(
+            f"{BASE_URL}/api/comments",
+            headers=_headers(),
+            json={"recipeId": recipe_id, "text": text},
+            timeout=30,
+        )
+        if not (200 <= r.status_code < 300):
+            return {"ok": False, "status": r.status_code, "body": r.text[:500]}
+        data = r.json()
+        return {"ok": True, "comment_id": data.get("id"), "slug": slug, "text": text}
+    except Exception as e:
+        return {"ok": False, "error": f"add_comment_failed: {e}"}
+
+
+@mcp.tool()
+def log_cooking_event(slug: str, subject: str, message: str | None = None) -> dict[str, Any]:
+    """
+    Registra un evento en el timeline de una receta en Mealie (cooking log).
+    Usalo cuando el usuario cocina una receta para tener historial de lo cocinado.
+    slug: slug de la receta.
+    subject: titulo del evento (ej: "Cocinado el lunes", "Batch domingo 2 mar").
+    message: detalle opcional (ej: "Menos sal que la receta. Tiempo real: 28 min").
+    """
+    if err := _check_token():
+        return err
+    try:
+        rr = requests.get(f"{BASE_URL}/api/recipes/{slug}", headers=_headers(), timeout=30)
+        if not (200 <= rr.status_code < 300):
+            return {"ok": False, "status": rr.status_code, "error": f"recipe_not_found: {slug}"}
+        recipe_id = rr.json().get("id")
+        if not recipe_id:
+            return {"ok": False, "error": f"recipe_id_missing_for: {slug}"}
+
+        payload: dict[str, Any] = {
+            "recipeId": recipe_id,
+            "subject": subject,
+            "eventType": "info",
+        }
+        if message:
+            payload["eventMessage"] = message
+
+        r = requests.post(
+            f"{BASE_URL}/api/recipes/timeline/events",
+            headers=_headers(),
+            json=payload,
+            timeout=30,
+        )
+        if not (200 <= r.status_code < 300):
+            return {"ok": False, "status": r.status_code, "body": r.text[:500]}
+        data = r.json()
+        return {"ok": True, "event_id": data.get("id"), "slug": slug, "subject": subject}
+    except Exception as e:
+        return {"ok": False, "error": f"log_cooking_event_failed: {e}"}
+
+
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")

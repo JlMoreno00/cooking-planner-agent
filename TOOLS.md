@@ -314,4 +314,54 @@ Añade una preferencia aprendida del usuario.
 
 ---
 
-**Última actualización**: 2026-02-27
+
+---
+
+### COMENTARIOS Y COOKING LOG (Fase 2)
+
+#### add_recipe_comment
+Añade un comentario de texto a una receta en Mealie, visible en el panel de escritorio.
+Usalo al guardar feedback para que el usuario vea sus notas junto a la receta.
+- Parametros: `slug` (string, obligatorio), `text` (string, obligatorio)
+- El texto puede incluir estrellas, notas y tags: "4/5 - Muy buena, menos sal la proxima vez."
+- Resuelve automaticamente el slug al UUID interno de la receta.
+```
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "add_recipe_comment", args: {slug: "curry-de-pollo", text: "4/5 — Muy buena. Menos sal la proxima vez."}}}
+```
+
+#### log_cooking_event
+Registra un evento en el timeline de una receta (historial de cuando se cocino).
+Usalo cuando el usuario confirma que ha terminado de cocinar una sesion de batch o un plato concreto.
+- Parametros: `slug` (string, obligatorio), `subject` (string, obligatorio), `message` (string, opcional)
+- Resuelve automaticamente el slug al UUID interno de la receta.
+```
+// Batch cooking:
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "log_cooking_event", args: {slug: "ramen-de-pollo", subject: "Batch domingo 1 mar 2026", message: "4 raciones. Añadi jengibre extra."}}}
+
+// Cocina fresca:
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "log_cooking_event", args: {slug: "ensalada-cesar", subject: "Cocinado — martes 3 mar 2026"}}}
+```
+
+---
+
+## Flujos Combinados — Actualizados con Fase 2
+
+### Guardar feedback con sincronizacion a Mealie
+```
+1. memory_local:save_feedback({recipe_name, rating, comment, tags})  // critico, primero
+2. search_recipes({query: recipe_name})  // obtener slug
+3. Si slug encontrado y hay rating o comentario:
+   add_recipe_comment({slug, text: "N/5 — [comentario]. [#tags]"})
+```
+
+### Registrar sesion de batch cooking completada
+```
+// Para cada receta cocinada:
+1. search_recipes({query: recipe_name})  // obtener slug
+2. Si slug encontrado:
+   log_cooking_event({slug, subject: "Batch [fecha]", message: "[raciones]. [notas]"})
+```
+
+---
+
+**Ultima actualizacion**: 2026-02-27

@@ -27,23 +27,27 @@ Si `isError` es `true`, el servidor falló — informa al usuario y ofrece alter
 
 ## Servidor: mealie_local
 
-**Propósito**: Biblioteca de recetas local (Mealie self-hosted). Primera opción SIEMPRE para buscar recetas.
+**Propósito**: Biblioteca de recetas local (Mealie self-hosted), lista de compra y calendario semanal. Primera opción SIEMPRE.
 
-### search_recipes
+---
+
+### RECETAS
+
+#### search_recipes
 Busca recetas en Mealie por nombre. Devuelve lista con nombre y slug.
 - Parámetros: `query` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "search_recipes", args: {query: "pollo al horno"}}}
 ```
 
-### get_recipe
-Obtiene una receta completa por su slug (incluyendo ingredientes e instrucciones).
+#### get_recipe
+Obtiene una receta completa por su slug (incluyendo ingredientes, instrucciones, ID y tags).
 - Parámetros: `slug` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "get_recipe", args: {slug: "pollo-al-horno"}}}
 ```
 
-### create_recipe
+#### create_recipe
 Crea una receta en Mealie. Si se pasa url, importa desde esa URL. Si no, crea por nombre.
 - Parámetros: `name` (string, obligatorio), `url` (string, opcional)
 ```
@@ -54,53 +58,119 @@ Con URL:
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "create_recipe", args: {name: "Paella", url: "https://ejemplo.com/paella"}}}
 ```
 
-### get_shopping_lists
+---
+
+### LISTAS DE COMPRA
+
+#### get_shopping_lists
 Devuelve todas las listas de compra del hogar con sus IDs y nombres.
 - Parámetros: ninguno
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "get_shopping_lists", args: {}}}
 ```
 
-### get_or_create_shopping_list
+#### get_or_create_shopping_list
 Busca una lista de compra por nombre; si no existe, la crea. Devuelve siempre el ID.
 - Parámetros: `name` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "get_or_create_shopping_list", args: {name: "Semana 10 - Marzo 2026"}}}
 ```
 
-### add_items_to_shopping_list
+#### add_items_to_shopping_list
 Añade ingredientes a una lista de compra existente.
 - Parámetros: `list_id` (string, obligatorio), `items` (array de strings, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "add_items_to_shopping_list", args: {list_id: "abc123", items: ["Tomates (1kg)", "Cebolla (2 unidades)", "Aceite de oliva"]}}}
 ```
 
-### add_recipe_ingredients_to_list
+#### add_recipe_ingredients_to_list
 Añade automáticamente TODOS los ingredientes de una receta a una lista de compra.
 - Parámetros: `list_id` (string, obligatorio), `recipe_slug` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "add_recipe_ingredients_to_list", args: {list_id: "list-uuid", recipe_slug: "pollo-al-horno"}}}
 ```
 
-### create_shopping_list
+#### create_shopping_list
 Crea una nueva lista de compra vacía con el nombre indicado.
 - Parámetros: `name` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "create_shopping_list", args: {name: "Lista especial"}}}
 ```
 
-### delete_shopping_list
+#### delete_shopping_list
 Elimina permanentemente una lista de compra por su ID.
 - Parámetros: `list_id` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "delete_shopping_list", args: {list_id: "list-uuid"}}}
 ```
 
-### clear_shopping_list
+#### clear_shopping_list
 Elimina todos los ítems de una lista de compra (vaciado completo).
 - Parámetros: `list_id` (string, obligatorio)
 ```
 {tool: "mcp", args: {action: "call", server: "mealie_local", tool: "clear_shopping_list", args: {list_id: "list-uuid"}}}
+```
+
+---
+
+### CALENDARIO / MEAL PLANNER ⭐ NUEVO
+
+El calendario de Mealie es el **panel visual de escritorio**. Cada vez que el usuario confirma el menú semanal, estas herramientas sincronizan el plan en el calendario de Mealie para que pueda verlo desde el ordenador.
+
+#### get_mealplan_week
+Obtiene el plan de comidas para un rango de fechas.
+- Parámetros: `start_date` (string "YYYY-MM-DD", obligatorio), `end_date` (string "YYYY-MM-DD", obligatorio)
+```
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "get_mealplan_week", args: {start_date: "2026-03-02", end_date: "2026-03-06"}}}
+```
+
+#### set_mealplan_entry
+Añade una entrada al calendario de Mealie. Si la receta existe en Mealie, crea un enlace directo a ella.
+- Parámetros:
+  - `date_str` (string "YYYY-MM-DD", obligatorio)
+  - `entry_type` (string: "lunch" | "dinner" | "breakfast" | "side", obligatorio)
+  - `title` (string, obligatorio — nombre del plato que aparece en el calendario)
+  - `recipe_slug` (string, opcional — si existe en Mealie, vincula la receta)
+```
+// Con receta vinculada (ideal):
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "set_mealplan_entry", args: {date_str: "2026-03-03", entry_type: "lunch", title: "Curry de pollo", recipe_slug: "curry-de-pollo"}}}
+
+// Sin receta (solo texto):
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "set_mealplan_entry", args: {date_str: "2026-03-03", entry_type: "lunch", title: "Libre / tupper semana anterior"}}}
+```
+
+#### delete_mealplan_entry
+Elimina una entrada del plan de comidas por su ID.
+- Parámetros: `entry_id` (string, obligatorio)
+```
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "delete_mealplan_entry", args: {entry_id: "entry-uuid"}}}
+```
+
+#### clear_mealplan_week
+Elimina TODAS las entradas del calendario en un rango de fechas. Úsalo ANTES de poblar la semana nueva.
+- Parámetros: `start_date` (string "YYYY-MM-DD", obligatorio), `end_date` (string "YYYY-MM-DD", obligatorio)
+```
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "clear_mealplan_week", args: {start_date: "2026-03-02", end_date: "2026-03-06"}}}
+```
+
+---
+
+### TAGS DE RECETAS ⭐ NUEVO
+
+Los tags permiten organizar la biblioteca de Mealie y filtrar recetas en el panel de escritorio.
+
+#### get_or_create_tag
+Busca un tag por nombre (case-insensitive); si no existe, lo crea. Devuelve ID y nombre.
+- Parámetros: `name` (string, obligatorio)
+```
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "get_or_create_tag", args: {name: "japonesa"}}}
+```
+
+#### tag_recipe
+Asigna tags a una receta existente. Conserva los tags ya existentes y añade los nuevos.
+- Parámetros: `slug` (string, obligatorio), `tags` (array de strings, obligatorio)
+```
+{tool: "mcp", args: {action: "call", server: "mealie_local", tool: "tag_recipe", args: {slug: "ramen-de-pollo", tags: ["japonesa", "rápido", "batch-friendly"]}}}
 ```
 
 ---
@@ -110,10 +180,13 @@ Elimina todos los ítems de una lista de compra (vaciado completo).
 **Propósito**: Búsqueda de recetas online y datos nutricionales. Usar cuando Mealie no tiene resultados.
 
 ### search_recipes
-Busca recetas online por texto.
-- Parámetros: `query` (string, obligatorio)
+Busca recetas online por texto, opcionalmente filtradas por nutrientes.
+- Parámetros obligatorios: `query` (string)
+- Parámetros opcionales de nutrición (todos float, por ración):
+  `max_calories`, `min_calories`, `max_protein_g`, `min_protein_g`,
+  `max_fat_g`, `min_fat_g`, `max_carbs_g`, `min_carbs_g`, `number` (int)
 ```
-{tool: "mcp", args: {action: "call", server: "spoonacular_local", tool: "search_recipes", args: {query: "pasta carbonara"}}}
+{tool: "mcp", args: {action: "call", server: "spoonacular_local", tool: "search_recipes", args: {query: "ramen", max_calories: 500}}}
 ```
 
 ### search_recipes_by_nutrients
@@ -188,30 +261,42 @@ Añade una preferencia aprendida del usuario.
 
 ## Flujos Combinados (Patrones Frecuentes)
 
-### Buscar receta (cascada Mealie -> Spoonacular)
-1. `mealie_local:search_recipes` con query del usuario
-2. Si hay resultados -> presentar con botones inline
-3. Si no hay resultados -> `spoonacular_local:search_recipes` con misma query
-4. Presentar resultados online con opción de importar a Mealie
+### Confirmar menú semanal → poblar calendario Mealie
+```
+1. clear_mealplan_week({start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD"})
+2. Para cada comida del menú:
+   a. search_recipes({query: "[nombre receta]"}) → obtener slug si existe
+   b. set_mealplan_entry({date_str: "YYYY-MM-DD", entry_type: "lunch"|"dinner", title: "[nombre]", recipe_slug: "[slug o null]"})
+3. get_or_create_shopping_list({name: "Semana X"})
+4. Para cada receta → add_recipe_ingredients_to_list
+```
 
-### Importar receta desde URL
-1. `recipe_scraper_local:scrape_recipe` para previsualizar
-2. Mostrar al usuario con botón de confirmación
-3. Si confirma -> `recipe_scraper_local:import_recipe_to_mealie`
+### Importar receta con auto-etiquetado
+```
+1. scrape_recipe({url: "..."}) → previsualizar
+2. import_recipe_to_mealie({url: "..."}) → guardar
+3. search_recipes({query: "[nombre]"}) → obtener slug
+4. tag_recipe({slug: "...", tags: ["tipo-cocina", "tiempo", "método", "categoría"]})
+```
 
-### Generar lista de compra desde menú semanal
-1. `mealie_local:get_or_create_shopping_list` con nombre de semana
-2. Para cada receta -> `mealie_local:add_recipe_ingredients_to_list`
-3. Presentar lista completa con botones de editar/confirmar
+### Buscar receta (cascada Mealie → Spoonacular)
+```
+1. search_recipes({query: "..."}) → si hay resultados, presentar
+2. Si no hay → spoonacular:search_recipes({query: "..."})
+3. Presentar resultados con opción de importar a Mealie
+```
 
 ### Consulta nutricional
-1. `spoonacular_local:ingredient_nutrition_100g` para el ingrediente
-2. Presentar datos (calorías, proteína, grasas, carbohidratos)
-3. Si falla -> informar honestamente, no inventar números
+```
+1. spoonacular:ingredient_nutrition_100g({ingredient: "..."})
+2. Presentar datos; si falla → informar honestamente, no inventar números
+```
 
 ### Guardar feedback de receta
-1. `memory_local:save_feedback` con nombre de receta
-2. Confirmar al usuario que se ha guardado
+```
+1. memory_local:save_feedback({recipe_name: "..."})
+2. Confirmar al usuario
+```
 
 ---
 
@@ -224,7 +309,9 @@ Añade una preferencia aprendida del usuario.
 | Spoonacular rate limit | Exceso de consultas API | Sugerir desde Mealie o IA |
 | URL no soportada | Web no compatible con scraper | Ofrecer creación manual |
 | memory_local falla | Error de escritura | Reintentar, informar si persiste |
+| set_mealplan_entry falla | Mealie sin conexión / token caducado | Continuar con lista de compra, informar brevemente |
+| tag_recipe falla | Receta no encontrada en Mealie | Informar, continuar sin etiquetas |
 
 ---
 
-**Última actualización**: 2026-02-26
+**Última actualización**: 2026-02-27

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Mealie MCP Server — búsqueda de recetas, gestión de listas de compra."""
+"""Mealie MCP Server — búsqueda de recetas, gestión de listas de compra y calendario semanal."""
 import json
 import os
+from datetime import date, timedelta
 from typing import Any
 
 import requests
@@ -64,6 +65,7 @@ def get_recipe(slug: str) -> dict[str, Any]:
         data = r.json()
         return {
             "ok": True,
+            "id": data.get("id"),
             "name": data.get("name"),
             "slug": data.get("slug"),
             "description": data.get("description", ""),
@@ -71,6 +73,7 @@ def get_recipe(slug: str) -> dict[str, Any]:
             "totalTime": data.get("totalTime", ""),
             "recipeIngredient": [i.get("display", "") for i in (data.get("recipeIngredient") or [])],
             "recipeInstructions": [s.get("text", "") for s in (data.get("recipeInstructions") or [])],
+            "tags": [{"id": t.get("id"), "name": t.get("name")} for t in (data.get("tags") or [])],
         }
     except Exception as e:
         return {"ok": False, "error": f"get_recipe_failed: {e}"}
@@ -261,6 +264,212 @@ def get_or_create_shopping_list(name: str) -> dict[str, Any]:
         return {"ok": True, "id": data["id"], "name": data["name"], "created": True}
     except Exception as e:
         return {"ok": False, "error": f"get_or_create_failed: {e}"}
+
+
+# ──────────────────────────────────────────────
+# CALENDARIO / MEAL PLANNER
+# ──────────────────────────────────────────────
+
+@mcp.tool()
+def get_mealplan_week(start_date: str, end_date: str) -> dict[str, Any]:
+    """
+    Obtiene el plan de comidas para un rango de fechas.
+    start_date / end_date: formato "YYYY-MM-DD"
+    """
+    if err := _check_token():
+        return err
+    try:
+        params = {"start_date": start_date, "end_date": end_date}
+        r = requests.get(f"{BASE_URL}/api/groups/mealplans", headers=_headers(), params=params, timeout=30)
+        if not (200 <= r.status_code < 300):
+            return {"ok": False, "status": r.status_code, "body": r.text[:1000]}
+        data = r.json()
+        entries = data.get("items") or []
+        result = []
+        for e in entries:
+            recipe = e.get("recipe") or {}
+            result.append({
+                "id": e.get("id"),
+                "date": e.get("date"),
+                "entryType": e.get("entryType"),
+                "title": e.get("title") or recipe.get("name", ""),
+                "recipe_slug": recipe.get("slug"),
+                "recipe_id": recipe.get("id"),
+            })
+        return {"ok": True, "total": len(result), "entries": result}
+    except Exception as e:
+        return {"ok": False, "error": f"get_mealplan_failed: {e}"}
+
+
+@mcp.tool()
+def set_mealplan_entry(date_str: str, entry_type: str, title: str, recipe_slug: str | None = None) -> dict[str, Any]:
+    """
+    Añade una entrada al calendario de Mealie.
+    date_str: "YYYY-MM-DD"
+    entry_type: "lunch" | "dinner" | "breakfast" | "side"
+    title: nombre del plato (se muestra siempre en el calendario)
+    recipe_slug: slug de la receta en Mealie (opcional — resuelve el ID automáticamente).
+                 Si la receta no existe en Mealie, se crea una entrada de texto sin enlace.
+    """
+    if err := _check_token():
+        return err
+    try:
+        payload: dict[str, Any] = {
+            "date": date_str,
+            "entryType": entry_type,
+            "title": title,
+            "text": "",
+        }
+
+        # Resolver slug → UUID si se proporcionó slug
+        if recipe_slug:
+            rr = requests.get(f"{BASE_URL}/api/recipes/{recipe_slug}", headers=_headers(), timeout=30)
+            if 200 <= rr.status_code < 300:
+                recipe_data = rr.json()
+                payload["recipeId"] = recipe_data.get("id")
+            # Si no existe la receta, continuamos sin recipeId (entrada solo con título)
+
+        r = requests.post(f"{BASE_URL}/api/groups/mealplans", headers=_headers(), json=payload, timeout=30)
+        if not (200 <= r.status_code < 300):
+            return {"ok": False, "status": r.status_code, "body": r.text[:500]}
+        data = r.json()
+        return {
+            "ok": True,
+            "id": data.get("id"),
+            "date": date_str,
+            "entry_type": entry_type,
+            "title": title,
+            "has_recipe_link": "recipeId" in payload,
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"set_mealplan_failed: {e}"}
+
+
+@mcp.tool()
+def delete_mealplan_entry(entry_id: str) -> dict[str, Any]:
+    """Elimina una entrada del plan de comidas por su ID."""
+    if err := _check_token():
+        return err
+    try:
+        r = requests.delete(f"{BASE_URL}/api/groups/mealplans/{entry_id}", headers=_headers(), timeout=30)
+        return {"ok": 200 <= r.status_code < 300, "status": r.status_code, "entry_id": entry_id}
+    except Exception as e:
+        return {"ok": False, "error": f"delete_mealplan_failed: {e}"}
+
+
+@mcp.tool()
+def clear_mealplan_week(start_date: str, end_date: str) -> dict[str, Any]:
+    """
+    Elimina todas las entradas del plan de comidas en el rango de fechas (inclusive).
+    start_date / end_date: formato "YYYY-MM-DD"
+    Úsalo antes de poblar la semana nueva para evitar duplicados.
+    """
+    if err := _check_token():
+        return err
+    try:
+        # Obtener entradas del rango
+        params = {"start_date": start_date, "end_date": end_date}
+        r = requests.get(f"{BASE_URL}/api/groups/mealplans", headers=_headers(), params=params, timeout=30)
+        if not (200 <= r.status_code < 300):
+            return {"ok": False, "status": r.status_code, "body": r.text[:500]}
+        entries = r.json().get("items") or []
+        if not entries:
+            return {"ok": True, "deleted": 0, "message": "No había entradas en ese rango"}
+
+        deleted = 0
+        errors = []
+        for entry in entries:
+            eid = entry.get("id")
+            if not eid:
+                continue
+            rd = requests.delete(f"{BASE_URL}/api/groups/mealplans/{eid}", headers=_headers(), timeout=30)
+            if 200 <= rd.status_code < 300:
+                deleted += 1
+            else:
+                errors.append({"id": eid, "status": rd.status_code})
+
+        return {"ok": True, "deleted": deleted, "errors": errors, "range": f"{start_date} → {end_date}"}
+    except Exception as e:
+        return {"ok": False, "error": f"clear_mealplan_failed: {e}"}
+
+
+# ──────────────────────────────────────────────
+# TAGS DE RECETAS
+# ──────────────────────────────────────────────
+
+@mcp.tool()
+def get_or_create_tag(name: str) -> dict[str, Any]:
+    """
+    Busca un tag por nombre (case-insensitive); si no existe, lo crea.
+    Devuelve el ID y nombre del tag.
+    """
+    if err := _check_token():
+        return err
+    try:
+        r = requests.get(f"{BASE_URL}/api/groups/tags", headers=_headers(), timeout=30)
+        if 200 <= r.status_code < 300:
+            tags = r.json().get("items") or []
+            for t in tags:
+                if (t.get("name") or "").lower() == name.lower():
+                    return {"ok": True, "id": t["id"], "name": t["name"], "created": False}
+
+        # No existe → crear
+        r2 = requests.post(f"{BASE_URL}/api/groups/tags", headers=_headers(), json={"name": name}, timeout=30)
+        if not (200 <= r2.status_code < 300):
+            return {"ok": False, "status": r2.status_code, "body": r2.text[:500]}
+        data = r2.json()
+        return {"ok": True, "id": data.get("id"), "name": data.get("name"), "created": True}
+    except Exception as e:
+        return {"ok": False, "error": f"get_or_create_tag_failed: {e}"}
+
+
+@mcp.tool()
+def tag_recipe(slug: str, tags: list[str]) -> dict[str, Any]:
+    """
+    Asigna etiquetas (tags) a una receta existente en Mealie.
+    slug: slug de la receta.
+    tags: lista de nombres de tag (ej: ["japonesa", "rápido", "batch-friendly"]).
+    Se respetan los tags ya existentes; solo se añaden los nuevos.
+    """
+    if err := _check_token():
+        return err
+    try:
+        # 1. Obtener receta actual (para conservar tags existentes)
+        r = requests.get(f"{BASE_URL}/api/recipes/{slug}", headers=_headers(), timeout=30)
+        if not (200 <= r.status_code < 300):
+            return {"ok": False, "status": r.status_code, "error": f"recipe_not_found: {slug}"}
+        recipe_data = r.json()
+        existing_tags = {t["id"]: t for t in (recipe_data.get("tags") or [])}
+
+        # 2. Resolver/crear cada tag nuevo
+        added = []
+        for tag_name in tags:
+            tag_result = get_or_create_tag(tag_name)
+            if tag_result.get("ok") and tag_result.get("id"):
+                tid = tag_result["id"]
+                if tid not in existing_tags:
+                    existing_tags[tid] = {"id": tid, "name": tag_result["name"]}
+                    added.append(tag_result["name"])
+
+        # 3. PATCH receta con la lista completa de tags
+        all_tags = list(existing_tags.values())
+        rp = requests.patch(
+            f"{BASE_URL}/api/recipes/{slug}",
+            headers=_headers(),
+            json={"tags": all_tags},
+            timeout=30,
+        )
+        if not (200 <= rp.status_code < 300):
+            return {"ok": False, "status": rp.status_code, "body": rp.text[:500]}
+
+        return {
+            "ok": True,
+            "slug": slug,
+            "tags_added": added,
+            "total_tags": len(all_tags),
+        }
+    except Exception as e:
+        return {"ok": False, "error": f"tag_recipe_failed: {e}"}
 
 
 if __name__ == "__main__":

@@ -280,7 +280,7 @@ def get_mealplan_week(start_date: str, end_date: str) -> dict[str, Any]:
         return err
     try:
         params = {"start_date": start_date, "end_date": end_date}
-        r = requests.get(f"{BASE_URL}/api/groups/mealplans", headers=_headers(), params=params, timeout=30)
+        r = requests.get(f"{BASE_URL}/api/households/mealplans", headers=_headers(), params=params, timeout=30)
         if not (200 <= r.status_code < 300):
             return {"ok": False, "status": r.status_code, "body": r.text[:1000]}
         data = r.json()
@@ -329,7 +329,7 @@ def set_mealplan_entry(date_str: str, entry_type: str, title: str, recipe_slug: 
                 payload["recipeId"] = recipe_data.get("id")
             # Si no existe la receta, continuamos sin recipeId (entrada solo con título)
 
-        r = requests.post(f"{BASE_URL}/api/groups/mealplans", headers=_headers(), json=payload, timeout=30)
+        r = requests.post(f"{BASE_URL}/api/households/mealplans", headers=_headers(), json=payload, timeout=30)
         if not (200 <= r.status_code < 300):
             return {"ok": False, "status": r.status_code, "body": r.text[:500]}
         data = r.json()
@@ -351,7 +351,7 @@ def delete_mealplan_entry(entry_id: str) -> dict[str, Any]:
     if err := _check_token():
         return err
     try:
-        r = requests.delete(f"{BASE_URL}/api/groups/mealplans/{entry_id}", headers=_headers(), timeout=30)
+        r = requests.delete(f"{BASE_URL}/api/households/mealplans/{entry_id}", headers=_headers(), timeout=30)
         return {"ok": 200 <= r.status_code < 300, "status": r.status_code, "entry_id": entry_id}
     except Exception as e:
         return {"ok": False, "error": f"delete_mealplan_failed: {e}"}
@@ -369,7 +369,7 @@ def clear_mealplan_week(start_date: str, end_date: str) -> dict[str, Any]:
     try:
         # Obtener entradas del rango
         params = {"start_date": start_date, "end_date": end_date}
-        r = requests.get(f"{BASE_URL}/api/groups/mealplans", headers=_headers(), params=params, timeout=30)
+        r = requests.get(f"{BASE_URL}/api/households/mealplans", headers=_headers(), params=params, timeout=30)
         if not (200 <= r.status_code < 300):
             return {"ok": False, "status": r.status_code, "body": r.text[:500]}
         entries = r.json().get("items") or []
@@ -382,7 +382,7 @@ def clear_mealplan_week(start_date: str, end_date: str) -> dict[str, Any]:
             eid = entry.get("id")
             if not eid:
                 continue
-            rd = requests.delete(f"{BASE_URL}/api/groups/mealplans/{eid}", headers=_headers(), timeout=30)
+            rd = requests.delete(f"{BASE_URL}/api/households/mealplans/{eid}", headers=_headers(), timeout=30)
             if 200 <= rd.status_code < 300:
                 deleted += 1
             else:
@@ -406,7 +406,7 @@ def get_or_create_tag(name: str) -> dict[str, Any]:
     if err := _check_token():
         return err
     try:
-        r = requests.get(f"{BASE_URL}/api/groups/tags", headers=_headers(), timeout=30)
+        r = requests.get(f"{BASE_URL}/api/organizers/tags", headers=_headers(), timeout=30)
         if 200 <= r.status_code < 300:
             tags = r.json().get("items") or []
             for t in tags:
@@ -414,7 +414,7 @@ def get_or_create_tag(name: str) -> dict[str, Any]:
                     return {"ok": True, "id": t["id"], "name": t["name"], "created": False}
 
         # No existe → crear
-        r2 = requests.post(f"{BASE_URL}/api/groups/tags", headers=_headers(), json={"name": name}, timeout=30)
+        r2 = requests.post(f"{BASE_URL}/api/organizers/tags", headers=_headers(), json={"name": name}, timeout=30)
         if not (200 <= r2.status_code < 300):
             return {"ok": False, "status": r2.status_code, "body": r2.text[:500]}
         data = r2.json()

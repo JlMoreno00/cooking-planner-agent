@@ -175,42 +175,99 @@ def _spoonacular_get(
 
 
 @mcp.tool()
-def search_recipes(query: str, number: int = 5) -> dict[str, Any]:
-    """Search recipes by free-text query via Spoonacular /recipes/complexSearch.
+def search_recipes(
+    query: str,
+    number: int = 5,
+    max_calories: float | None = None,
+    min_calories: float | None = None,
+    max_protein_g: float | None = None,
+    min_protein_g: float | None = None,
+    max_fat_g: float | None = None,
+    min_fat_g: float | None = None,
+    max_carbs_g: float | None = None,
+    min_carbs_g: float | None = None,
+) -> dict[str, Any]:
+    """Search recipes by free-text query with optional nutrient filters via /recipes/complexSearch.
+
+    Combines keyword search with nutritional constraints in a single request.
 
     Args:
-        query:  Keywords to search for (e.g. "pasta carbonara", "chicken salad").
-        number: Number of results to return (default 5, max 100).
+        query:        Keywords to search for (e.g. "pasta carbonara", "ramen").
+        number:       Number of results to return (default 5, max 100).
+        max_calories: Maximum calories (kcal) per serving.
+        min_calories: Minimum calories (kcal) per serving.
+        max_protein_g: Maximum protein in grams per serving.
+        min_protein_g: Minimum protein in grams per serving.
+        max_fat_g:    Maximum fat in grams per serving.
+        min_fat_g:    Minimum fat in grams per serving.
+        max_carbs_g:  Maximum carbohydrates in grams per serving.
+        min_carbs_g:  Minimum carbohydrates in grams per serving.
 
     Returns:
-        ok=True  with a list of matching recipes (id, title, image, source_url).
+        ok=True  with a list of matching recipes (id, title, image, source_url,
+                 and nutrition data when nutrient filters are used).
         ok=False with error details on auth/rate/network failure.
     """
-    result = _spoonacular_get(
-        "/recipes/complexSearch",
-        {
-            "query": query,
-            "number": max(1, min(number, 100)),
-            "addRecipeInformation": False,
-        },
-    )
+    params: dict[str, Any] = {
+        "query": query,
+        "number": max(1, min(number, 100)),
+    }
+
+    # Map optional nutrient filters to Spoonacular API param names
+    nutrient_map = {
+        "maxCalories": max_calories,
+        "minCalories": min_calories,
+        "maxProtein": max_protein_g,
+        "minProtein": min_protein_g,
+        "maxFat": max_fat_g,
+        "minFat": min_fat_g,
+        "maxCarbs": max_carbs_g,
+        "minCarbs": min_carbs_g,
+    }
+    has_nutrient_filter = False
+    for api_name, value in nutrient_map.items():
+        if value is not None:
+            params[api_name] = value
+            has_nutrient_filter = True
+
+    # Include nutrition data in response when nutrient filters are active
+    if has_nutrient_filter:
+        params["addRecipeNutrition"] = True
+    params["addRecipeInformation"] = False
+
+    result = _spoonacular_get("/recipes/complexSearch", params)
     if not result["ok"]:
         return result
 
     data = result["data"]
-    recipes = [
-        {
+    recipes = []
+    for r in data.get("results") or []:
+        entry: dict[str, Any] = {
             "id": r.get("id"),
             "title": r.get("title"),
             "image": r.get("image"),
             "source_url": r.get("sourceUrl"),
         }
-        for r in (data.get("results") or [])
-    ]
+        # Extract key nutrients when nutrition data is present
+        nutrition = r.get("nutrition")
+        if nutrition and isinstance(nutrition, dict):
+            for n in nutrition.get("nutrients") or []:
+                name = n.get("name", "")
+                if name == "Calories":
+                    entry["calories_kcal"] = n.get("amount")
+                elif name == "Protein":
+                    entry["protein_g"] = n.get("amount")
+                elif name == "Fat":
+                    entry["fat_g"] = n.get("amount")
+                elif name == "Carbohydrates":
+                    entry["carbs_g"] = n.get("amount")
+        recipes.append(entry)
+
     return {
         "ok": True,
         "query": query,
         "total": data.get("totalResults", len(recipes)),
+        "filters_applied": {k: v for k, v in nutrient_map.items() if v is not None} or None,
         "recipes": recipes,
     }
 

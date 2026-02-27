@@ -12,9 +12,6 @@
       "description": "Telegram channel for meal planning interactions"
     }
   },
-  "mcp": {
-    "servers": []
-  },
   "cron": {
     "jobs": []
   },

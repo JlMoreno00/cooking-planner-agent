@@ -106,9 +106,12 @@ _MANUAL_ALIASES: dict[str, str] = {
     "laurel":         "Laurel",
     "hoja de laurel": "Laurel",
     "hojas de laurel":"Laurel",
-    "boniato":        "Süsskartoffeln",
-    "batata":         "Süsskartoffeln",
-    "camote":         "Süsskartoffeln",
+    # Süsskartoffeln tiene EN pero no ES → usar "Boniato" como texto libre legible
+    "boniato":        "Boniato",
+    "batata":         "Boniato",
+    "camote":         "Boniato",
+    "sweet potato":   "Boniato",
+    "sweet potatoes": "Boniato",
     "judias verdes":  "Bohnen",   # sin tilde (normalizado)
     "judia verde":    "Bohnen",
     "green bean":     "Bohnen",

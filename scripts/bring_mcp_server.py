@@ -38,6 +38,13 @@ _QUANTITY_NOUNS = {
     "chorrito", "chorritos",# dashes
     "hoja", "hojas",        # leaves
     "rama", "ramas",        # branches/stalks
+    # English
+    "clove", "cloves", "can", "cans", "cup", "cups", "sprig", "sprigs",
+    "slice", "slices", "bunch", "bunches", "pinch", "pinches",
+    "piece", "pieces", "fillet", "fillets", "leaf",
+    # Cooking units that appear as "unit de food" in Spanish
+    "cucharadita", "cucharaditas", "cucharada", "cucharadas",
+    "tablespoon", "tablespoons", "teaspoon", "teaspoons",
 }
 
 _PREP_WORDS = {
@@ -80,24 +87,77 @@ def _load_catalog(lang: str) -> dict[str, str]:
                 singular_key = " ".join([words[0][:-1]] + words[1:])
                 if singular_key not in result:
                     result[singular_key] = german_key
+            # Also singularize the LAST word for compound entries: "sweet potatoes" → "sweet potato"
+            if len(words) > 1 and words[-1].endswith("s") and len(words[-1]) > 4:
+                singular_last = " ".join(words[:-1] + [words[-1][:-1]])
+                if singular_last not in result:
+                    result[singular_last] = german_key
         return result
     return {}
 
 _CAT_ES = _load_catalog("es-ES")   # 373 ítems en español
 _CAT_EN = _load_catalog("en-US")   # 383 ítems en inglés
 
+# Manual aliases for ingredients that don't resolve via fuzzy matching
+# {normalized_food_name: german_key}
+_MANUAL_ALIASES: dict[str, str] = {
+    "bay leaf":       "Laurel",
+    "bay leaves":     "Laurel",
+    "laurel":         "Laurel",
+    "hoja de laurel": "Laurel",
+    "hojas de laurel":"Laurel",
+    "boniato":        "Süsskartoffeln",
+    "batata":         "Süsskartoffeln",
+    "camote":         "Süsskartoffeln",
+    "judias verdes":  "Bohnen",   # sin tilde (normalizado)
+    "judia verde":    "Bohnen",
+    "green bean":     "Bohnen",
+    "green beans":    "Bohnen",
+    "comino":         "Kümmel",
+    "cumin":          "Kümmel",
+    "cayena":         "Cayennepfeffer",
+    "cayenne":        "Cayennepfeffer",
+    "red pepper flakes": "Cayennepfeffer",
+    "chili flakes":   "Cayennepfeffer",
+    "chile flakes":   "Cayennepfeffer",
+    "kale":           "Grünkohl",
+    "col rizada":     "Grünkohl",
+    "pimenton":       "Paprikapulver",   # sin tilde
+    "pimenton ahumado": "Paprikapulver",
+    "smoked paprika": "Paprikapulver",
+    "sweet potato":   "Süsskartoffeln",
+    "sweet potatoes": "Süsskartoffeln",
+}
+
+
+def _remove_accents(text: str) -> str:
+    """Normaliza texto eliminando tildes para comparación."""
+    subs = [("á","a"),("é","e"),("í","i"),("ó","o"),("ú","u"),
+            ("à","a"),("è","e"),("ì","i"),("ò","o"),("ù","u"),
+            ("ñ","n"),("ü","u"),("ö","o"),("ä","a")]
+    for a, b in subs:
+        text = text.replace(a, b)
+    return text
+
+
 def _catalog_match(food_name: str) -> str | None:
     """
     Busca el mejor ítem del catálogo Bring! para el nombre de alimento dado.
-    Estrategia en cascada: exact → startswith → word-in-food → word-overlap.
-    Devuelve el nombre canónico del catálogo, o None si no hay match fiable.
+    Estrategia en cascada: aliases manuales → exact → startswith → word-in-food → word-overlap.
+    Devuelve la clave alemana interna de Bring!, o None si no hay match fiable.
     """
     norm = food_name.lower().strip()
+    norm_no_acc = _remove_accents(norm)
+    # 0. Manual aliases (highest priority)
+    if norm in _MANUAL_ALIASES: return _MANUAL_ALIASES[norm]
+    if norm_no_acc in _MANUAL_ALIASES: return _MANUAL_ALIASES[norm_no_acc]
 
     for cat in (_CAT_ES, _CAT_EN):
-        # 1. Exact match
+        # 1. Exact match (with and without accents)
         if norm in cat:
             return cat[norm]
+        if norm_no_acc in cat:
+            return cat[norm_no_acc]
 
         # 2. Parsed starts with catalog item: "tomates triturados" → "Tomates"
         candidates = [
@@ -224,6 +284,11 @@ def _clean_food_name(name: str) -> str:
             if new != name:
                 name = new
                 changed = True
+    # "harissa o cayena" / "thyme or rosemary" → try first recognized option
+    if re.search(r"\b(o|or)\b", name, re.IGNORECASE):
+        parts = re.split(r"\s+(?:o|or)\s+", name, flags=re.IGNORECASE)
+        name = parts[0].strip()  # use first option; catalog_match will try both if needed
+
     return name.capitalize() if name else name
 
 
@@ -232,8 +297,11 @@ def _parse_ingredient(text: str) -> tuple[str, str]:
     Parsea texto libre de ingrediente.
     1. Llama al NLP de Mealie para extraer food/unit/quantity.
     2. Busca el mejor match en el catálogo Bring! (iconos + clasificación).
-    3. Devuelve (item_id, spec) donde item_id es el nombre canónico de Bring!.
+    3. Devuelve (item_id, spec) donde item_id es la clave alemana de Bring!.
     """
+    # Si el texto tiene comas separando ingredientes distintos, usar solo el primero
+    # Ej: "1 cdta de comino, 1 cdta de pimentón" → "1 cdta de comino"
+    text = text.split(",")[0].strip() if re.search(r",\s*\d", text) else text
     text_norm = _normalize_text(text)
     food_name, unit, qty = "", "", 0.0
 

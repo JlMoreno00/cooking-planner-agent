@@ -68,17 +68,18 @@ def _load_catalog(lang: str) -> dict[str, str]:
     for p in base.rglob(f"articles.{lang}.json"):
         data = json.loads(p.read_text())
         result: dict[str, str] = {}
-        for v in data.values():
-            key = v.lower()
-            result[key] = v
-            # Alias singular: si el PRIMER token termina en 's' (y tiene >4 chars),
-            # añadir la versión sin 's' como clave alternativa.
-            # Ej: "cebollas" → "cebolla"; "tomates cherry" → "tomate cherry"
+        # data = {german_key: localized_name}
+        # We want {localized_name_lower: german_key} so that itemId sent to the API
+        # is always the German internal key that Bring! needs for icons & categories.
+        for german_key, localized_name in data.items():
+            key = localized_name.lower()
+            result[key] = german_key
+            # Singular alias: "cebollas" → "cebolla" maps to same german key "Zwiebeln"
             words = key.split()
             if words and words[0].endswith("s") and len(words[0]) > 4:
                 singular_key = " ".join([words[0][:-1]] + words[1:])
                 if singular_key not in result:
-                    result[singular_key] = v
+                    result[singular_key] = german_key
         return result
     return {}
 

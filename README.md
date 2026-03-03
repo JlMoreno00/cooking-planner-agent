@@ -16,7 +16,7 @@ OpenClaw — Agente "Sabor"
 ┌─────────────────────────────────┐
 │         MCP Servers             │
 │  mealie · scraper · spoonacular │
-│  memory                         │
+│  memory · bring · video-recipe  │
 └─────────────────────────────────┘
       ↕  REST API
 🖥️ Mealie (panel visual de escritorio)
@@ -60,6 +60,8 @@ OpenClaw — Agente "Sabor"
 | `recipe_scraper_mcp_server.py` | 9151 | 2 | Scraping de recetas desde URLs externas |
 | `spoonacular_mcp_server.py` | 9152 | 3 | Búsqueda y datos nutricionales vía Spoonacular API |
 | `memory_mcp_server.py` | 9153 | 4 | Memoria persistente del agente (perfil, preferencias, feedback) |
+| `bring_mcp_server.py` | 9154 | 3 | Sincronización de lista con Bring! usando catálogo oficial |
+| `video_recipe_mcp_server.py` | 9155 | 2 | Extrae recetas desde videos YouTube/TikTok y crea recetas separadas en Mealie |
 
 Todos arrancan con `scripts/start-cooking-mcps.sh` y se gestionan como servicio systemd (`cooking-mcps.service`).
 
@@ -145,6 +147,8 @@ Cooking Planner Agent/
 │   ├── recipe_scraper_mcp_server.py # MCP scraper
 │   ├── spoonacular_mcp_server.py    # MCP Spoonacular
 │   ├── memory_mcp_server.py         # MCP memoria
+│   ├── bring_mcp_server.py          # MCP Bring! (lista compra)
+│   ├── video_recipe_mcp_server.py   # MCP video -> multi-receta Mealie
 │   ├── start-cooking-mcps.sh        # Arrancar todos los MCPs
 │   ├── setup-sabor-bot.sh           # Configurar bot Telegram
 │   └── seed_mealie_import.py        # Seed inicial de recetas

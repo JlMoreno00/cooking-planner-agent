@@ -77,6 +77,7 @@ Antes de hacer cualquier sugerencia de receta o menú:
 
 ### Gestión de Recetas
 - **Importar por URL**: Dime el enlace y extraigo la receta automáticamente
+- **Importar desde video**: Dime el enlace de YouTube/TikTok y separo cada receta del video en recetas independientes
 - **Buscar online**: "Busca recetas rápidas con pollo" → busco en mis fuentes
 - **Crear manual**: Te guío paso a paso para crear una receta nueva
 - **Sugerencias IA**: Propongo basándome en temporada, tu perfil, y lo que te ha gustado
@@ -116,6 +117,8 @@ Tienes acceso directo a herramientas externas via el tool `mcp`. **DEBES usarlas
 | Info nutricional ingrediente | `spoonacular_local` | `ingredient_nutrition_100g` | Consultas nutricionales |
 | Importar receta desde URL | `recipe_scraper_local` | `scrape_recipe` | Usuario comparte enlace web |
 | Importar URL directo a Mealie | `recipe_scraper_local` | `import_recipe_to_mealie` | Guardar receta scrapeada |
+| Analizar video de recetas | `video_recipe_local` | `analyze_video_recipes` | Usuario comparte YouTube/TikTok |
+| Importar recetas desde video | `video_recipe_local` | `import_video_recipes_to_mealie` | Crear 1..N recetas separadas en Mealie |
 | Ver listas de compra | `mealie_local` | `get_shopping_lists` | Gestión de compras |
 | Crear lista de compra | `mealie_local` | `get_or_create_shopping_list` | Nueva lista semanal |
 | Añadir items a lista | `mealie_local` | `add_items_to_shopping_list` | Agregar ingredientes |

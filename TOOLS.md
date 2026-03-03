@@ -225,6 +225,42 @@ Importa una receta en Mealie directamente desde una URL.
 
 ---
 
+## Servidor: video_recipe_local
+
+**Propósito**: Ingesta de enlaces de YouTube/TikTok para extraer una o varias recetas del video y guardarlas por separado en Mealie.
+
+### analyze_video_recipes
+Analiza un video, obtiene transcripción (subtítulos o fallback de audio), segmenta recetas y devuelve ingredientes/pasos por receta.
+- Parámetros:
+  - `url` (string, obligatorio)
+  - `language` (string, opcional, por defecto `"es"`)
+  - `max_recipes` (int, opcional, por defecto `8`)
+  - `include_visual_context` (bool, opcional, por defecto `true`)
+```
+{tool: "mcp", args: {action: "call", server: "video_recipe_local", tool: "analyze_video_recipes", args: {url: "https://www.youtube.com/watch?v=...", language: "es", max_recipes: 5}}}
+```
+
+### import_video_recipes_to_mealie
+Extrae recetas del video y crea cada receta como entrada independiente en Mealie, con control por confianza y deduplicación por nombre.
+- Parámetros:
+  - `url` (string, obligatorio)
+  - `language` (string, opcional, por defecto `"es"`)
+  - `max_recipes` (int, opcional, por defecto `8`)
+  - `min_confidence` (float 0..1, opcional, por defecto `0.55`)
+  - `include_visual_context` (bool, opcional, por defecto `true`)
+  - `dry_run` (bool, opcional, por defecto `false`)
+```
+{tool: "mcp", args: {action: "call", server: "video_recipe_local", tool: "import_video_recipes_to_mealie", args: {url: "https://www.tiktok.com/@.../video/...", max_recipes: 5, min_confidence: 0.6}}}
+```
+
+Notas operativas:
+- Si hay subtítulos, se usan como fuente primaria.
+- Si no hay subtítulos, usa fallback de transcripción con `faster-whisper` (si está instalado).
+- Si no puede extraer transcripción, devuelve error explícito (no inventa recetas).
+- Las recetas creadas se etiquetan como `video-import` + plataforma + `video:<id>`.
+
+---
+
 ## Servidor: memory_local
 
 **Propósito**: Lectura y escritura de MEMORY.md del workspace. Para persistir datos del usuario.

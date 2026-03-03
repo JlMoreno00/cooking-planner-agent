@@ -48,4 +48,5 @@ start_mcp "recipe-scraper" "recipe_scraper_mcp_server.py" 9151
 start_mcp "spoonacular"    "spoonacular_mcp_server.py"  9152
 start_mcp "memory"         "memory_mcp_server.py"       9153
 start_mcp "bring"          "bring_mcp_server.py"        9154
+start_mcp "video-recipe"   "video_recipe_mcp_server.py" 9155
 echo "=== MCP servers iniciados ==="
